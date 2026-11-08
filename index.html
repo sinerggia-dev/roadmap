@@ -284,6 +284,12 @@
     cursor:pointer;font-size:13px;gap:6px;border-left:3px solid transparent;transition:background .12s ease;
   }
   .page-row:hover{background:var(--hover);}
+  /* Arrastar para reordenar. A linha indica ONDE vai cair — sem ela a pessoa
+     solta no escuro e so descobre o resultado depois. */
+  .page-row.arrastando{opacity:.45;}
+  .page-row.alvo-antes{box-shadow:inset 0 2px 0 0 var(--accent);}
+  .page-row.alvo-depois{box-shadow:inset 0 -2px 0 0 var(--accent);}
+  .page-row.recusa{cursor:not-allowed;}
   .page-row.active{background:var(--accent-light);color:var(--accent-hover);font-weight:600;border-left-color:var(--accent);}
   .page-title-label{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .row-toggle{
@@ -2861,6 +2867,103 @@ function pageIcon(page){
   return "📝 ";
 }
 
+/* Arrastar paginas na barra lateral.
+
+   So reordena entre IRMAS: soltar numa pagina de outro nivel mudaria o pai, e
+   isso acontece sem querer com facilidade. O alvo de outro nivel simplesmente
+   nao aceita. */
+let paginaArrastada = null;
+
+function limpaMarcasDeArraste(){
+  document.querySelectorAll(".page-row.alvo-antes, .page-row.alvo-depois, .page-row.recusa")
+    .forEach(el => el.classList.remove("alvo-antes", "alvo-depois", "recusa"));
+}
+
+function mesmoNivel(a, b){
+  const pa = indexData.pages.find(p => p.id === a);
+  const pb = indexData.pages.find(p => p.id === b);
+  return !!(pa && pb && (pa.parentId || null) === (pb.parentId || null));
+}
+
+/* Renumera o nivel inteiro de 1 em diante.
+
+   Dava para so inventar um numero entre os vizinhos, mas depois de algumas
+   trocas os numeros ficam amontoados e a ordem passa a depender de empate.
+   Renumerando, a lista guardada e exatamente a lista que se ve. */
+function reordenarPaginas(idMovida, idAlvo, depois){
+  const movida = indexData.pages.find(p => p.id === idMovida);
+  const alvo = indexData.pages.find(p => p.id === idAlvo);
+  if (!movida || !alvo || movida === alvo) return false;
+  const pai = movida.parentId || null;
+  if ((alvo.parentId || null) !== pai) return false;
+
+  const irmas = indexData.pages
+    .filter(p => (p.parentId || null) === pai)
+    .sort((a, b) => a.order - b.order);
+
+  const semMovida = irmas.filter(p => p.id !== idMovida);
+  let destino = semMovida.findIndex(p => p.id === idAlvo);
+  if (destino < 0) return false;
+  if (depois) destino++;
+  semMovida.splice(destino, 0, movida);
+  semMovida.forEach((p, i) => { p.order = i + 1; });
+  return true;
+}
+
+function ligaArrasteDaPagina(row, page){
+  row.draggable = true;
+
+  row.addEventListener("dragstart", (e) => {
+    paginaArrastada = page.id;
+    row.classList.add("arrastando");
+    try{ e.dataTransfer.setData("text/plain", page.id); }catch(err){}
+    e.dataTransfer.effectAllowed = "move";
+  });
+
+  row.addEventListener("dragend", () => {
+    row.classList.remove("arrastando");
+    paginaArrastada = null;
+    limpaMarcasDeArraste();
+  });
+
+  row.addEventListener("dragover", (e) => {
+    if (!paginaArrastada || paginaArrastada === page.id) return;
+    if (!mesmoNivel(paginaArrastada, page.id)){
+      row.classList.add("recusa");
+      e.dataTransfer.dropEffect = "none";
+      return;   // sem preventDefault: o navegador recusa a solta
+    }
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    const r = row.getBoundingClientRect();
+    const depois = (e.clientY - r.top) > r.height / 2;
+    row.classList.toggle("alvo-antes", !depois);
+    row.classList.toggle("alvo-depois", depois);
+  });
+
+  row.addEventListener("dragleave", () => {
+    row.classList.remove("alvo-antes", "alvo-depois", "recusa");
+  });
+
+  row.addEventListener("drop", async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const movida = paginaArrastada || e.dataTransfer.getData("text/plain");
+    limpaMarcasDeArraste();
+    if (!movida || movida === page.id) return;
+    if (!mesmoNivel(movida, page.id)) return;
+
+    const r = row.getBoundingClientRect();
+    const depois = (e.clientY - r.top) > r.height / 2;
+
+    // A senha so e pedida quando a ordem vai mesmo mudar.
+    if (!(await requestEditPassword("ordemPaginas"))) return;
+    if (!reordenarPaginas(movida, page.id, depois)) return;
+    scheduleSaveIndex();
+    buildTree();
+  });
+}
+
 function renderPageRow(page, depth, hasChildren){
   const row = document.createElement("div");
   row.className = "page-row" + (page.id === currentPageId ? " active" : "");
@@ -2883,6 +2986,10 @@ function renderPageRow(page, depth, hasChildren){
   if (addSub) addSub.addEventListener("click", (e) => { e.stopPropagation(); showKindMenu(page.id, addSub); });
   const delBtn = row.querySelector(".del-page");
   if (delBtn) delBtn.addEventListener("click", (e) => { e.stopPropagation(); deletePage(page.id); });
+  if (canEdit){
+    ligaArrasteDaPagina(row, page);
+    row.title = "Arraste para mudar a ordem";
+  }
   return row;
 }
 
@@ -4260,6 +4367,7 @@ const ACOES_COM_SENHA = [
   { key: "moverColunas",   label: "Mover colunas de lugar (arrastar o cabeçalho)" },
   { key: "layoutColunas",  label: "Esconder e restaurar colunas" },
   { key: "layoutBarra",    label: "Mover e esconder botões e filtros da barra" },
+  { key: "ordemPaginas",   label: "Mudar a ordem das páginas na barra lateral" },
 ];
 
 /* Ausente = exige. E o que faz quem nunca mexeu na lista continuar com a regra de
