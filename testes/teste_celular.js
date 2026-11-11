@@ -168,6 +168,29 @@ ok("o vencimento vira a borda do cartao",
 ok("as celulas presas do computador param de prender",
    /position:static/.test(mob));
 
+/* ---- 8. o painel do topo divide a linha com o botao do menu ----
+   Antes o botao flutuava sozinho e o painel ocupava uma faixa inteira logo
+   abaixo: duas linhas para informacao de apoio, numa tela onde cada linha
+   disputa espaco com as atividades. */
+// O bloco pequeno de @media que cuida do painel do topo. Fatiado por indice:
+// montar esse recorte por expressao regular exigiria escapes que ja se
+// perderam uma vez no caminho ate aqui.
+const iPainel = src.indexOf("#painelTopo{", src.indexOf("@media (max-width:768px){"));
+const blocoPainel = iPainel > 0 ? src.slice(iPainel, iPainel + 1400) : "";
+ok("o painel recua para a largura do botao do menu",
+   /#painelTopo\{[\s\S]{0,160}margin:0 0 10px 60px/.test(blocoPainel));
+ok("e o recuo cobre o botao (38px) com folga",
+   /width:38px/.test(src) && /margin:0 0 10px 60px/.test(blocoPainel));
+ok("o painel nao quebra em varias linhas", /flex-wrap:nowrap/.test(blocoPainel));
+// O pedido foi MOVER as funcoes, nao tirar nenhuma.
+ok("o botao de atualizar o tempo continua",
+   /#ptAtualizar\{width:24px/.test(blocoPainel) && /#ptAtualizar\{display:none/.test(blocoPainel) === false);
+ok("o local continua", /#ptLocal\{font-size:11px/.test(blocoPainel) &&
+   /#ptLocal\{display:none/.test(blocoPainel) === false);
+ok("so sai o que o proprio telefone ja mostra: a data por extenso",
+   /#ptData\{display:none;\}/.test(blocoPainel));
+ok("o alfinete e a cidade nao quebram linha", /#ptLocal\{[\s\S]{0,40}white-space:nowrap/.test(blocoPainel));
+
 let n = 0;
 console.log("");
 for (const [d2, c] of casos) { if (c) n++; console.log((c ? "ok    " : "FALHA ") + d2); }

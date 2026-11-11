@@ -87,7 +87,12 @@ ok("e o botão ↻ força a atualização", /btn\.addEventListener\("click", ptA
 ok("o painel usa os tokens do tema, não cor fixa",
    /#painelTopo\{[^}]*var\(--surface\)/.test(src) &&
    !/#painelTopo\{[^}]*#[0-9a-f]{6}/i.test(src));
-ok("no celular ele deixa de flutuar", /#painelTopo\{float:none/.test(src));
+// No celular ele deixa de flutuar E passa a dividir a linha com o botao do
+// menu, em vez de ocupar uma faixa so dele.
+const iPt = src.indexOf("#painelTopo{", src.indexOf("@media (max-width:768px){"));
+const ptMob = iPt > 0 ? src.slice(iPt, iPt + 400) : "";
+ok("no celular ele deixa de flutuar", /float:none/.test(ptMob));
+ok("e fica ao lado do botao do menu", /margin:0 0 10px 60px/.test(ptMob));
 ok("nasce escondido, para não piscar antes de ter nome",
    /id="painelTopo" hidden/.test(src));
 

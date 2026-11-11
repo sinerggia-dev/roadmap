@@ -451,8 +451,28 @@
   #ptAtualizar:hover{background:var(--hover);color:var(--text);}
   #ptAtualizar:disabled{opacity:.5;cursor:default;}
   @media (max-width:768px){
-    /* No celular ele vira uma linha propria: flutuando, espremeria o titulo. */
-    #painelTopo{float:none;margin:0 0 12px;justify-content:flex-start;}
+    /* O painel divide a linha com o botao do menu, em vez de ocupar uma faixa
+       so dele. O recuo de 60px e a largura do botao (38) mais a folga, para o
+       painel nao passar por baixo dele. */
+    #painelTopo{
+      float:none;margin:0 0 10px 60px;justify-content:flex-start;
+      min-height:38px;padding:4px 12px;font-size:12px;gap:7px;
+      flex-wrap:nowrap;overflow:hidden;
+    }
+    /* Encolhe o que e de apoio para caber ao lado do botao. */
+    #painelTopo .pt-avatar{width:26px;height:26px;font-size:12px;}
+    /* O botao de atualizar o tempo e o local FICAM: o pedido foi mover estas
+       funcoes para a linha do menu, nao tirar nenhuma delas. */
+    #painelTopo #ptAtualizar{width:24px;height:24px;font-size:12px;flex:0 0 auto;}
+    #painelTopo .pt-sep{margin:0 1px;}
+    /* So o que e repetido sai: a data por extenso, que o telefone ja mostra na
+       barra dele, e a palavra da saudacao — o nome, que identifica, continua. */
+    #painelTopo #ptData{display:none;}
+    #painelTopo .pt-saudacao small{display:none;}
+    /* O alfinete e o nome da cidade quebravam em duas linhas e engordavam a
+       pilula inteira. */
+    #painelTopo #ptLocal{font-size:11px;white-space:nowrap;}
+    #painelTopo .pt-clima, #painelTopo .pt-relogio{white-space:nowrap;}
   }
   #pageView.wide{max-width:none;margin:0;padding-left:40px;padding-right:40px;}
   #readOnlyBanner{

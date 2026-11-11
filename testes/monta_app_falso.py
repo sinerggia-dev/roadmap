@@ -88,7 +88,9 @@ window.fetch = function(url){
   if (url.indexOf("pagina_") >= 0) return resp(PAGINA);
   if (url.indexOf("sharedWithMe") >= 0) return resp({ value: [] });
   if (url.indexOf("/children") >= 0) return resp({ value: [] });
-  if (url.indexOf("wttr") >= 0 || url.indexOf("open-meteo") >= 0) return resp({});
+  // Tempo de mentira, para o painel do topo aparecer completo na medicao.
+  if (url.indexOf("wttr") >= 0 || url.indexOf("open-meteo") >= 0)
+    return resp({ current: { temperature_2m: 28, weather_code: 3 } });
   return resp({ id: "folder1", name: "Notas Pessoais - Dados" });
 };
 </script>
@@ -132,6 +134,7 @@ medidor = u"""
     return;
   }
 
+  if (location.search.indexOf('semclique') >= 0){ document.title = 'pronto'; return; }
   var t1 = performance.now();
   alvo.click();
   await esperar(50);
