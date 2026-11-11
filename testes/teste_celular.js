@@ -111,6 +111,63 @@ ok("as janelas ocupam a largura toda no celular",
 ok("código longo quebra em vez de estourar a janela",
    /overflow-wrap:anywhere/.test(mob));
 
+/* ---- 7. cada atividade vira um cartao ----
+   A tabela tem 16 colunas. Num telefone cabem tres, e as tres primeiras eram
+   ITENS, EMPRESA e RESPONSAVEL: o NOME DA TAREFA ficava fora da tela, e era
+   preciso rolar de lado em cada linha para saber do que se tratava. */
+const linha = ex("renderTaskRow");
+
+// A chave e o rotulo viajam na celula: e isso que deixa o CSS empilhar sem um
+// segundo desenho em JS, que duplicaria a logica de cada coluna.
+ok("cada celula carrega a sua coluna", /td\.dataset\.col = key/.test(linha));
+ok("e o rotulo da coluna", /td\.dataset\.rotulo = \(def && def\.label\) \|\| key/.test(linha));
+ok("o CSS usa esse rotulo", /content:attr\(data-rotulo\)/.test(mob));
+
+ok("a tabela vira blocos no celular", /#taskTable\{[\s\S]{0,200}display:block/.test(mob));
+ok("o cabecalho some", /#taskTable thead\{display:none;\}/.test(mob));
+ok("cada linha vira cartao", /#taskTable tr\{[\s\S]{0,160}border-radius:11px/.test(mob));
+ok("cada celula vira rotulo e valor", /#taskTable td\{[\s\S]{0,120}display:flex/.test(mob));
+
+// A largura total da tabela e calculada em JS e gravada inline (soma das
+// colunas, as vezes acima de 2000px). Sem !important o cartao nasce maior que
+// a tela e os valores ficam fora dela.
+ok("a largura inline calculada em JS e vencida",
+   /#taskTable\{[\s\S]{0,260}width:100% !important/.test(mob));
+ok("e o codigo explica por que o !important e necessario",
+   /largura total da tabela e calculada em JS/.test(mob));
+
+// .wide impoe 40px de cada lado e vence por especificidade — num telefone isso
+// e um quinto da tela so em margem.
+ok("a margem lateral larga do computador e reduzida",
+   /#pageView\.wide\{padding-left:12px !important/.test(mob));
+ok("e a barra de rolagem reservada deixa de roubar largura",
+   /#taskTableWrap\{overflow:visible !important/.test(mob));
+
+ok("o nome da tarefa e o titulo do cartao, sem rotulo",
+   /#taskTable td\[data-col="title"\]::before\{content:none;\}/.test(mob));
+ok("e aparece em destaque", /data-col="title"\] > \*\{[\s\S]{0,60}font-weight:600/.test(mob));
+
+// Fechado mostra so o essencial: dezesseis linhas por atividade seria pior que
+// a rolagem lateral que isto veio corrigir.
+const regraFechado = (mob.match(/#taskTable tr:not\(\.aberto\)[^{]*\{[^}]*\}/) || [""])[0];
+["title", "company", "assignee", "dueDate", "status"].forEach(c => {
+  ok("cartao fechado mostra " + c, regraFechado.indexOf('data-col="' + c + '"') >= 0);
+});
+ok("e esconde o resto", /display:none/.test(regraFechado));
+
+ok("ha um botao para abrir o cartao", /className = "card-abrir"/.test(linha));
+ok("que alterna e troca a seta",
+   /classList\.toggle\("aberto"\)[\s\S]{0,120}abrir\.textContent = aberto/.test(linha));
+ok("o clique no botao nao marca a caixa de selecao",
+   /abrir\.addEventListener\("click", \(e\) => \{[\s\S]{0,40}e\.stopPropagation\(\)/.test(linha));
+
+ok("o cabecalho de grupo continua uma faixa, nao um cartao",
+   /#taskTable tr\.task-group-row\{[\s\S]{0,120}background:none/.test(mob));
+ok("o vencimento vira a borda do cartao",
+   /#taskTable tr\.due-vencido\{border-left:3px solid var\(--danger\)/.test(mob));
+ok("as celulas presas do computador param de prender",
+   /position:static/.test(mob));
+
 let n = 0;
 console.log("");
 for (const [d2, c] of casos) { if (c) n++; console.log((c ? "ok    " : "FALHA ") + d2); }

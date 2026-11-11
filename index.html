@@ -1565,7 +1565,77 @@
     #pageView{padding:56px 16px 120px;}
     #pageTitle{font-size:20px;}
     .block-gutter{opacity:1;}
-    #taskTable{font-size:12px;}
+    /* ---- Cada atividade vira um cartao ----
+       A tabela tem 16 colunas; num telefone cabem tres, e as tres primeiras
+       nao incluem o nome da tarefa. Aqui as mesmas celulas sao empilhadas. */
+    /* !important: a largura total da tabela e calculada em JS e gravada em
+       estilo embutido (soma das colunas, as vezes 2000px). Sem isto o cartao
+       nasce mais largo que a tela e os valores ficam fora dela. */
+    #taskTable{
+      font-size:13px;display:block;border-collapse:separate;
+      width:100% !important;max-width:100% !important;table-layout:auto;
+    }
+    #taskTable thead{display:none;}
+    #taskTable tbody{display:block;width:100%;}
+    #taskTable tr{
+      display:block;width:100%;margin:0 0 10px;padding:10px 12px;
+      background:var(--surface);border:1px solid var(--sidebar-border);border-radius:11px;
+      box-shadow:var(--shadow-sm);
+    }
+    /* A faixa de vencimento vira a borda esquerda do cartao. */
+    #taskTable tr.due-vencido{border-left:3px solid var(--danger);}
+    #taskTable tr.due-hoje{border-left:3px solid #d9a500;}
+    #taskTable td{
+      display:flex;align-items:center;justify-content:space-between;gap:10px;
+      width:auto;max-width:none;min-width:0;border:none;padding:5px 0;
+      white-space:normal;overflow:visible;text-overflow:clip;
+    }
+    #taskTable td::before{
+      content:attr(data-rotulo);flex:0 0 38%;min-width:0;
+      font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;
+      color:var(--text-dim);
+    }
+    /* O que esta dentro da celula fica a direita e ocupa o resto. */
+    #taskTable td > *{flex:1 1 auto;min-width:0;max-width:62%;}
+    /* A tarefa e o titulo do cartao: sem rotulo, grande, em cima. */
+    #taskTable td[data-col="title"]{display:block;padding:0 0 6px;}
+    #taskTable td[data-col="title"]::before{content:none;}
+    #taskTable td[data-col="title"] > *{max-width:none;font-size:15px;font-weight:600;}
+    /* Linha de selecao vira o cabecalho do cartao, com o botao de abrir. */
+    #taskTable td.task-select-td{
+      display:flex;justify-content:space-between;padding:0 0 4px;
+    }
+    #taskTable td.task-select-td::before{content:none;}
+    #taskTable td.task-select-td > *{flex:0 0 auto;max-width:none;}
+    .card-abrir{
+      display:inline-flex;align-items:center;justify-content:center;
+      width:30px;height:30px;border-radius:8px;cursor:pointer;
+      background:var(--sidebar-bg);border:1px solid var(--sidebar-border);
+      color:var(--text-light);font-size:13px;font-family:inherit;
+    }
+    /* Fechado, so o essencial. Dezesseis linhas por atividade seria pior que a
+       rolagem lateral que isto veio corrigir. */
+    #taskTable tr:not(.aberto) td:not(.task-select-td):not([data-col="title"]):not([data-col="company"]):not([data-col="assignee"]):not([data-col="dueDate"]):not([data-col="status"]){
+      display:none;
+    }
+    /* Cabecalho de grupo: continua uma faixa, nao um cartao. */
+    #taskTable tr.task-group-row{
+      display:block;background:none;border:none;box-shadow:none;
+      padding:10px 2px 4px;margin:0;
+    }
+    #taskTable tr.task-group-row td{display:flex;padding:0;}
+    #taskTable tr.task-group-row td::before{content:none;}
+    /* Sem colunas lado a lado, nao ha mais o que rolar de lado. As celulas
+       presas (sticky) do computador tambem perdem sentido empilhadas. */
+    /* .wide impoe 40px de cada lado e vence a regra do #pageView por
+       especificidade — num telefone isso e um quinto da tela em margem. */
+    #pageView.wide{padding-left:12px !important;padding-right:12px !important;}
+    /* Sem colunas lado a lado nao ha o que rolar, e a barra reservada roubava
+       mais 15px da largura util. */
+    #taskTableWrap{overflow:visible !important;max-height:none !important;}
+    #taskTable td.task-select-td, #taskTable td[data-col="title"],
+    #taskTable tr.task-group-row td.task-group-check,
+    #taskTable tr.task-group-row td.task-group-label{position:static;}
     /* Codigos longos (id de arquivo, endereco) nao quebram sozinhos e estouram
        a janela para fora da tela. */
     #resumoModal, #dlgModal{width:100%;max-width:100%;}
@@ -7981,10 +8051,30 @@ function renderTaskRow(task, assigneeOptions){
     ));
   });
   tdSelect.appendChild(selectCb);
+  // So aparece no celular (o CSS decide). Sem ele, o cartao fechado esconderia
+  // campos sem dar como chegar neles.
+  const abrir = document.createElement("button");
+  abrir.type = "button";
+  abrir.className = "card-abrir";
+  abrir.textContent = "\u25be";
+  abrir.title = "Ver todos os campos";
+  abrir.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const aberto = tr.classList.toggle("aberto");
+    abrir.textContent = aberto ? "\u25b4" : "\u25be";
+    abrir.title = aberto ? "Recolher" : "Ver todos os campos";
+  });
+  tdSelect.appendChild(abrir);
   tr.appendChild(tdSelect);
 
+  // A coluna e o rotulo viajam na propria celula: e isso que permite ao CSS do
+  // celular empilha-las como "rotulo: valor" sem um segundo desenho em JS.
   visibleColumnOrder().forEach(key => {
-    tr.appendChild(TASK_CELL_BUILDERS[key](task, assigneeOptions));
+    const td = TASK_CELL_BUILDERS[key](task, assigneeOptions);
+    td.dataset.col = key;
+    const def = TASK_COLUMNS_DEF.find(c => c.key === key);
+    td.dataset.rotulo = (def && def.label) || key;
+    tr.appendChild(td);
   });
 
   const tdActions = document.createElement("td");
