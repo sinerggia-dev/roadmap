@@ -2,7 +2,11 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- viewport-fit=cover: sem isso o iPhone deixa faixas pretas ao lado do
+     entalhe. O conteudo volta para dentro da area segura pelo CSS. -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#121315">
+<meta name="mobile-web-app-capable" content="yes">
 <title>ROADMAP</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,6 +17,12 @@
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
+  html{
+    /* O sistema do celular reescala texto por conta propria em paginas que nao
+       dizem nada; aqui o tamanho e o que esta escrito. */
+    -webkit-text-size-adjust:100%;
+    text-size-adjust:100%;
+  }
   :root{
     /* color-scheme:dark faz o navegador desenhar em modo escuro o que e dele:
        calendario do input type=date, barras de rolagem, caixas de selecao. */
@@ -1482,28 +1492,61 @@
       width:85vw;min-width:0;max-width:300px;overflow:visible;
       border-right:1px solid var(--sidebar-border);
     }
+    /* Area segura: no iPhone o entalhe e a barra de gestos comem as bordas. */
+    body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right);}
+    #pageView{padding-bottom:calc(120px + env(safe-area-inset-bottom));}
+
+    /* O iPhone da zoom sozinho ao tocar num campo com fonte menor que 16px, e
+       a pagina fica torta e so volta com dois dedos. 16px e o limiar. */
+    input, select, textarea, button{font-size:16px;}
+
     /* ---- Filtros no celular ----
-       Grade de 6 colunas: cada campo declara quantas colunas ocupa, entao a
-       barra fica igual em qualquer largura de tela em vez de depender de onde
-       o flex-wrap resolveu quebrar. O rotulo volta (o corte de 1024px o esconde),
-       senao nao se sabe do que e cada caixa. */
+       Recolhidos por padrao: abertos, sao quase 780px de controles antes da
+       primeira atividade — mais de uma tela inteira num telefone. */
+    #filtrosToggleBtn{
+      display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;
+      margin-bottom:12px;padding:10px 12px;border-radius:9px;cursor:pointer;
+      background:var(--surface);border:1px solid var(--sidebar-border);
+      color:var(--text);font-size:14px;font-family:inherit;
+    }
+    #filtrosToggleBtn .ft-conta{
+      background:var(--accent-btn);color:#fff;border-radius:11px;padding:1px 8px;font-size:12px;
+    }
+    #filtrosToggleBtn .ft-conta[hidden]{display:none;}
+    #filtrosToggleBtn .ft-seta{color:var(--text-light);font-size:12px;}
+    #taskToolbarRow:not(.aberto){display:none;}
+
     .filter-field-label{display:block;font-size:10px;}
     #taskToolbarRow{
-      display:grid;grid-template-columns:repeat(6, 1fr);gap:12px 8px;align-items:end;
+      /* minmax(0,...) e o que impede o vazamento: `1fr` sozinho e
+         `minmax(auto, 1fr)`, e conteudo que nao quebra empurra a coluna alem
+         da fracao, deixando a linha mais larga que a tela. */
+      display:grid;grid-template-columns:repeat(6, minmax(0, 1fr));gap:12px 8px;align-items:end;
       margin-bottom:16px;
     }
+    #taskToolbarRow > *{min-width:0;}
     #taskToolbarRow > [data-tkey]{grid-column:span 3;min-width:0;}
     #taskToolbarRow > [data-tkey="due"],
     #taskToolbarRow > [data-tkey="search"]{grid-column:span 6;}
     #taskToolbarRow > [data-tkey="clear"],
     #taskToolbarRow > [data-tkey="export"],
     #taskToolbarRow > [data-tkey="print"]{grid-column:span 2;}
-    #tableViewBtn, #kanbanViewBtn{width:100%;justify-content:center;}
+    #tableViewBtn, #kanbanViewBtn, #groupCompanyBtn, #importarResumosBtn{
+      width:100%;justify-content:center;white-space:normal;text-align:center;
+      height:auto;min-height:36px;padding:6px 4px;font-size:12px;line-height:1.2;
+    }
+    /* A linha de Nova tarefa tambem vazava: o total e as pilulas nao quebravam. */
+    #taskStatusRow{min-width:0;}
+    #taskStatusPills{flex-wrap:wrap;}
     #taskFilterTabs, .filter-control-wrap{display:block;width:100%;}
     /* !important: a largura arrastada no computador fica em style inline. */
+    /* 16px, nao 13: abaixo disso o iPhone amplia a pagina ao focar o campo.
+       A regra geral acima e vencida por estes seletores de id, entao o tamanho
+       precisa estar aqui tambem. Os campos ficam um pouco maiores; e menos
+       incomodo que a pagina pular de lugar a cada toque. */
     #statusFilterSelect, #dueStateFilterSelect, #companyFilterSelect,
     #assigneeFilterSelect, #taskSearchInput, #dueFromFilter, #dueToFilter{
-      width:100% !important;max-width:none !important;height:34px;font-size:13px;
+      width:100% !important;max-width:none !important;height:40px;font-size:16px;
     }
     #dueFilterWrap > .filter-control-wrap{flex:1 1 0;}
     /* Os tres botoes de acao dividem uma linha; o texto pode quebrar em duas. */
@@ -1523,6 +1566,11 @@
     #pageTitle{font-size:20px;}
     .block-gutter{opacity:1;}
     #taskTable{font-size:12px;}
+    /* Codigos longos (id de arquivo, endereco) nao quebram sozinhos e estouram
+       a janela para fora da tela. */
+    #resumoModal, #dlgModal{width:100%;max-width:100%;}
+    #resumoLeitura, #resumoModalTaskTitle, #dlgTexto{overflow-wrap:anywhere;}
+    #resumoEditor{height:46vh;}
     .cal-day{min-height:60px;padding:3px;}
     .cal-day-num{font-size:11px;width:16px;height:16px;}
     .cal-event-pill{font-size:9px;padding:1px 3px;}
@@ -1690,6 +1738,11 @@
       </div>
       <div id="tasksView">
         <div id="printFiltersSummary"></div>
+        <button type="button" id="filtrosToggleBtn" hidden aria-expanded="false">
+          <span>⚙ Filtros</span>
+          <span class="ft-conta" id="filtrosConta" hidden>0</span>
+          <span class="ft-seta" id="filtrosSeta">▾</span>
+        </button>
         <div id="taskToolbarRow">
           <button id="tableViewBtn" class="view-toggle-btn active" data-tkey="tableView">☰ Tabela</button>
           <button id="kanbanViewBtn" class="view-toggle-btn" data-tkey="kanbanView">▦ Kanban</button>
@@ -3523,6 +3576,47 @@ function abrirPainelTema(){
   if (esq + largura > window.innerWidth - 8) esq = window.innerWidth - largura - 8;
   p.style.left = Math.max(8, esq) + "px";
   p.style.top = (r.bottom + 6) + "px";
+}
+
+/* ---------- Filtros recolhidos no celular ----------
+
+   Abertos, sao quase 780px de controles antes da primeira atividade. Mas
+   esconder filtro tem um risco conhecido: um filtro ligado e invisivel faz
+   faltarem linhas sem explicacao — ja aconteceu neste app com os botoes
+   escondidos. Por isso o botao mostra QUANTOS estao ativos. */
+function contarFiltrosAtivos(){
+  let n = 0;
+  if (taskCompanyFilter && taskCompanyFilter !== "Todas") n++;
+  if (taskAssigneeFilter && taskAssigneeFilter !== "Todos") n++;
+  if (taskPriorityFilter && taskPriorityFilter !== "Todas") n++;
+  if (taskDueStateFilter && taskDueStateFilter !== "Todos") n++;
+  if (taskDueFromFilter) n++;
+  if (taskDueToFilter) n++;
+  if (taskSearchText && taskSearchText.trim()) n++;
+  return n;
+}
+
+function atualizaBotaoFiltros(){
+  const btn = document.getElementById("filtrosToggleBtn");
+  if (!btn) return;
+  const n = contarFiltrosAtivos();
+  const conta = document.getElementById("filtrosConta");
+  if (conta){ conta.textContent = String(n); conta.hidden = n === 0; }
+  const barra = document.getElementById("taskToolbarRow");
+  const aberto = !!(barra && barra.classList.contains("aberto"));
+  const seta = document.getElementById("filtrosSeta");
+  if (seta) seta.textContent = aberto ? "\u25b4" : "\u25be";
+  btn.setAttribute("aria-expanded", aberto ? "true" : "false");
+}
+
+const btnFiltros = document.getElementById("filtrosToggleBtn");
+if (btnFiltros){
+  btnFiltros.hidden = false;   // o CSS do celular e quem o mostra
+  btnFiltros.addEventListener("click", () => {
+    const barra = document.getElementById("taskToolbarRow");
+    if (barra) barra.classList.toggle("aberto");
+    atualizaBotaoFiltros();
+  });
 }
 
 const btnTema = document.getElementById("temaBtn");
@@ -5368,6 +5462,9 @@ function renderTasks(){
   if (taskGroupByCompany) renderTableGrouped(tbody, sorted, assigneeOptions);
   else sorted.forEach(task => tbody.appendChild(renderTaskRow(task, assigneeOptions)));
   renderSelectAllHeaderCell(sorted);
+  // No celular os filtros ficam recolhidos: a contagem no botao e o unico
+  // sinal de que algum esta ligado. Precisa acompanhar cada redesenho.
+  if (typeof atualizaBotaoFiltros === "function") atualizaBotaoFiltros();
 }
 
 /* Monta a tabela em blocos por empresa. A ordenacao escolhida no cabecalho

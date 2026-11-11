@@ -1,0 +1,118 @@
+// Testa a visão de celular (Android e iPhone).
+//
+// Três defeitos reais, vistos em captura a 390px:
+//
+//  1. A barra de filtros VAZAVA para fora da tela. `repeat(6, 1fr)` é na
+//     verdade `minmax(auto, 1fr)`: conteúdo que não quebra empurra a coluna
+//     além da fração e a linha fica mais larga que o telefone.
+//  2. Eram quase 780px de controles antes da primeira atividade — mais de uma
+//     tela inteira só de filtros.
+//  3. O iPhone dá zoom sozinho ao tocar num campo com fonte menor que 16px, e
+//     a página fica torta até a pessoa desfazer com dois dedos.
+const fs = require("fs");
+const src = fs.readFileSync((process.env.ALVO_HTML || require("path").join(__dirname, "..", "index.html")), "utf8");
+
+function ex(n, prefixo) {
+  const marca = (prefixo || "function ") + n + "(";
+  const i = src.indexOf(marca);
+  if (i < 0) throw new Error("nao achei " + n);
+  let d = 0, f = -1;
+  for (let j = src.indexOf("{", i); j < src.length; j++) {
+    if (src[j] === "{") d++; else if (src[j] === "}") { d--; if (!d) { f = j + 1; break; } }
+  }
+  return src.slice(i, f);
+}
+
+// O bloco do celular, para não confundir com regras de telas grandes.
+const iMob = src.indexOf("@media (max-width: 768px){");
+let d = 0, fimMob = -1;
+for (let j = src.indexOf("{", iMob); j < src.length; j++) {
+  if (src[j] === "{") d++; else if (src[j] === "}") { d--; if (!d) { fimMob = j + 1; break; } }
+}
+const mob = src.slice(iMob, fimMob);
+
+const casos = [];
+const ok = (d2, c, extra) => casos.push([d2 + (c || !extra ? "" : "  <- " + extra), !!c]);
+
+/* ---- 1. o vazamento da grade ---- */
+// `1fr` sozinho é o que deixava a barra mais larga que a tela.
+ok("a grade dos filtros usa minmax(0, 1fr)",
+   /grid-template-columns:repeat\(6, minmax\(0, 1fr\)\)/.test(mob));
+ok("e `repeat(6, 1fr)` não sobrou em lugar nenhum",
+   /repeat\(6, 1fr\)/.test(mob) === false);
+ok("todo filho da barra pode encolher", /#taskToolbarRow > \*\{min-width:0;\}/.test(mob));
+ok("os botões da barra quebram o texto em vez de esticar a coluna",
+   /#tableViewBtn, #kanbanViewBtn, #groupCompanyBtn, #importarResumosBtn\{[\s\S]{0,180}white-space:normal/.test(mob));
+
+/* ---- 2. o zoom do iPhone ---- */
+// Abaixo de 16px o Safari amplia a página ao focar o campo.
+ok("campos têm 16px no celular", /input, select, textarea, button\{font-size:16px;\}/.test(mob));
+const m13 = mob.match(/font-size:1[0-5](\.\d+)?px/g) || [];
+// A regra geral acima e vencida por seletores de id: o tamanho precisa estar
+// repetido no bloco dos filtros, senao o iPhone continua ampliando.
+const blocoFiltros = (mob.match(/#statusFilterSelect[\s\S]{0,260}?\}/) || [""])[0];
+ok("os campos de filtro tambem declaram 16px", /font-size:16px/.test(blocoFiltros),
+   blocoFiltros.replace(/\s+/g, " ").slice(0, 120));
+ok("e nenhum deles ficou abaixo disso",
+   /font-size:1[0-5](\.\d+)?px/.test(blocoFiltros) === false);
+
+/* ---- 3. área segura e metas ---- */
+ok("o viewport cobre o entalhe", /viewport-fit=cover/.test(src));
+ok("há cor para a barra do navegador", /<meta name="theme-color"/.test(src));
+ok("o conteúdo respeita a área segura das laterais",
+   /padding-left:env\(safe-area-inset-left\)/.test(mob));
+ok("e a barra de gestos embaixo", /env\(safe-area-inset-bottom\)/.test(mob));
+ok("o sistema não reescala o texto por conta própria",
+   /-webkit-text-size-adjust:100%/.test(src));
+
+/* ---- 4. filtros recolhidos ---- */
+ok("os filtros começam recolhidos no celular",
+   /#taskToolbarRow:not\(\.aberto\)\{display:none;\}/.test(mob));
+ok("há um botão para abri-los", /id="filtrosToggleBtn"/.test(src));
+ok("o botão só aparece no celular", /#filtrosToggleBtn\{[\s\S]{0,40}display:flex/.test(mob));
+ok("a seta indica aberto ou fechado", /seta\.textContent = aberto/.test(src));
+
+/* ---- 5. o risco de esconder filtro: filtro ligado e invisível ---- */
+// Já aconteceu neste app com os botões escondidos: faltavam linhas e ninguém
+// entendia por quê. O contador no botão é o que impede a repetição.
+globalThis.taskCompanyFilter = "Todas";
+globalThis.taskAssigneeFilter = "Todos";
+globalThis.taskPriorityFilter = "Todas";
+globalThis.taskDueStateFilter = "Todos";
+globalThis.taskDueFromFilter = "";
+globalThis.taskDueToFilter = "";
+globalThis.taskSearchText = "";
+eval(ex("contarFiltrosAtivos") + "\nglobalThis.contarFiltrosAtivos = contarFiltrosAtivos;");
+
+ok("sem filtro, conta zero", contarFiltrosAtivos() === 0);
+const liga = [
+  ["taskCompanyFilter", "Novatec"], ["taskAssigneeFilter", "Natanael"],
+  ["taskPriorityFilter", "Alta"],   ["taskDueStateFilter", "vencido"],
+  ["taskDueFromFilter", "2026-01-01"], ["taskDueToFilter", "2026-12-31"],
+  ["taskSearchText", "reunião"],
+];
+liga.forEach(([k, v], i) => {
+  globalThis[k] = v;
+  ok("conta o filtro de " + k.replace("task", "").replace("Filter", ""),
+     contarFiltrosAtivos() === i + 1, String(contarFiltrosAtivos()));
+});
+ok("conta os sete juntos", contarFiltrosAtivos() === 7);
+// Espaço em branco na busca não é filtro: contaria sem filtrar nada.
+globalThis.taskSearchText = "   ";
+ok("busca só com espaços não conta", contarFiltrosAtivos() === 6);
+
+ok("o contador some quando não há filtro", /conta\.hidden = n === 0/.test(src));
+ok("e acompanha cada redesenho da tabela",
+   /if \(typeof atualizaBotaoFiltros === "function"\) atualizaBotaoFiltros\(\);/.test(ex("renderTasks")));
+
+/* ---- 6. janelas que não cabiam no telefone ---- */
+ok("as janelas ocupam a largura toda no celular",
+   /#resumoModal, #dlgModal\{width:100%;max-width:100%;\}/.test(mob));
+ok("código longo quebra em vez de estourar a janela",
+   /overflow-wrap:anywhere/.test(mob));
+
+let n = 0;
+console.log("");
+for (const [d2, c] of casos) { if (c) n++; console.log((c ? "ok    " : "FALHA ") + d2); }
+console.log("\n" + n + "/" + casos.length + " ok");
+process.exit(n === casos.length ? 0 : 1);
