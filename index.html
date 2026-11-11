@@ -454,9 +454,14 @@
     /* O painel divide a linha com o botao do menu, em vez de ocupar uma faixa
        so dele. O recuo de 60px e a largura do botao (38) mais a folga, para o
        painel nao passar por baixo dele. */
+    /* As contas do alinhamento, para nao virarem numero magico:
+         o botao do menu e fixo em top:12px e tem 38px de altura (12 a 50);
+         o #pageView do celular tem 56px de recuo no topo.
+       Para o painel comecar nos mesmos 12px, ele sobe 44px (56 - 12). A altura
+       minima de 38px iguala a do botao, e os dois terminam juntos em 50. */
     #painelTopo{
-      float:none;margin:0 0 10px 60px;justify-content:flex-start;
-      min-height:38px;padding:4px 12px;font-size:12px;gap:7px;
+      float:none;margin:-44px 0 10px 60px;justify-content:flex-start;
+      min-height:38px;box-sizing:border-box;padding:4px 12px;font-size:12px;gap:7px;
       flex-wrap:nowrap;overflow:hidden;
     }
     /* Encolhe o que e de apoio para caber ao lado do botao. */

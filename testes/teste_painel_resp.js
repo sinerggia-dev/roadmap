@@ -92,7 +92,7 @@ ok("o painel usa os tokens do tema, não cor fixa",
 const iPt = src.indexOf("#painelTopo{", src.indexOf("@media (max-width:768px){"));
 const ptMob = iPt > 0 ? src.slice(iPt, iPt + 400) : "";
 ok("no celular ele deixa de flutuar", /float:none/.test(ptMob));
-ok("e fica ao lado do botao do menu", /margin:0 0 10px 60px/.test(ptMob));
+ok("e fica ao lado do botao do menu, na mesma altura", /margin:-44px 0 10px 60px/.test(ptMob));
 ok("nasce escondido, para não piscar antes de ter nome",
    /id="painelTopo" hidden/.test(src));
 

@@ -175,12 +175,12 @@ ok("as celulas presas do computador param de prender",
 // O bloco pequeno de @media que cuida do painel do topo. Fatiado por indice:
 // montar esse recorte por expressao regular exigiria escapes que ja se
 // perderam uma vez no caminho ate aqui.
-const iPainel = src.indexOf("#painelTopo{", src.indexOf("@media (max-width:768px){"));
-const blocoPainel = iPainel > 0 ? src.slice(iPainel, iPainel + 1400) : "";
+const iPainel = src.indexOf("@media (max-width:768px){");
+const blocoPainel = iPainel > 0 ? src.slice(iPainel, iPainel + 1800) : "";
 ok("o painel recua para a largura do botao do menu",
-   /#painelTopo\{[\s\S]{0,160}margin:0 0 10px 60px/.test(blocoPainel));
+   /#painelTopo\{[\s\S]{0,200}margin:-44px 0 10px 60px/.test(blocoPainel));
 ok("e o recuo cobre o botao (38px) com folga",
-   /width:38px/.test(src) && /margin:0 0 10px 60px/.test(blocoPainel));
+   /width:38px/.test(src) && /margin:-44px 0 10px 60px/.test(blocoPainel));
 ok("o painel nao quebra em varias linhas", /flex-wrap:nowrap/.test(blocoPainel));
 // O pedido foi MOVER as funcoes, nao tirar nenhuma.
 ok("o botao de atualizar o tempo continua",
@@ -190,6 +190,36 @@ ok("o local continua", /#ptLocal\{font-size:11px/.test(blocoPainel) &&
 ok("so sai o que o proprio telefone ja mostra: a data por extenso",
    /#ptData\{display:none;\}/.test(blocoPainel));
 ok("o alfinete e a cidade nao quebram linha", /#ptLocal\{[\s\S]{0,40}white-space:nowrap/.test(blocoPainel));
+
+/* ---- 9. o painel ALINHADO com o botao do menu ----
+   Nao basta estar na mesma linha: na primeira tentativa o painel comecava
+   44px abaixo do botao e ficava visivelmente torto.
+
+   Tres numeros se amarram, e e por isso que este teste faz a conta em vez de
+   fixar o resultado: se alguem mudar o recuo do #pageView ou a posicao do
+   botao, o painel desalinha em silencio. */
+function num(re, onde){
+  const m = re.exec(onde || src);
+  return m ? Number(m[1]) : null;
+}
+const btnTop = num(/#mobileMenuBtn\{[\s\S]{0,120}?top:(\d+)px/);
+const btnAlt = num(/#mobileMenuBtn\{[\s\S]{0,160}?height:(\d+)px/);
+const iPv = src.indexOf("#pageView{padding:", src.indexOf("@media (max-width: 768px){"));
+const pvTopo = num(/#pageView\{padding:(\d+)px/, src.slice(iPv, iPv + 80));
+const ptMargem = num(/#painelTopo\{[\s\S]{0,80}?margin:(-?\d+)px/, blocoPainel);
+const ptAltura = num(/#painelTopo\{[\s\S]{0,200}?min-height:(\d+)px/, blocoPainel);
+
+ok("li os numeros dos dois elementos",
+   btnTop !== null && btnAlt !== null && pvTopo !== null && ptMargem !== null && ptAltura !== null,
+   "botao " + btnTop + "/" + btnAlt + ", pageView " + pvTopo + ", painel " + ptMargem + "/" + ptAltura);
+// O painel comeca em (recuo do pageView + sua margem); o botao, em top.
+ok("o painel comeca na mesma altura do botao",
+   pvTopo + ptMargem === btnTop, (pvTopo + ptMargem) + " vs " + btnTop);
+ok("e termina junto com ele", ptAltura === btnAlt, ptAltura + " vs " + btnAlt);
+ok("a altura conta a borda, senao o painel passa do botao",
+   /box-sizing:border-box/.test(blocoPainel));
+ok("o codigo mostra a conta, para nao virar numero magico",
+   /56 - 12/.test(blocoPainel));
 
 let n = 0;
 console.log("");
