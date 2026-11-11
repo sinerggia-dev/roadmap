@@ -65,6 +65,56 @@
     --pessoa-natanael:#b6c2de;
     --pessoa-ivanilda:#8fb8ff;
   }
+  /* Preto puro. Em tela OLED o preto nao acende pixel: cansa menos a noite e
+     gasta menos bateria. Os cartoes ficam um degrau acima do fundo, senao a
+     tabela some dentro dele. */
+  :root[data-tema="preto"]{
+    color-scheme:dark;
+    --bg:#000000;
+    --surface:#141416;
+    --surface-2:#1f1f23;
+    --sidebar-bg:#080809;
+    --sidebar-border:#2f2f35;
+    --text:#f2f2f3;
+    --text-light:#a8a8ae;
+    --text-dim:#8e8e96;
+    --accent:#9095f2;
+    --accent-hover:#a9aef8;
+    --accent-btn:#5257d0;
+    --accent-light:#23243a;
+    --danger:#ff6b70;
+    --divider:#242428;
+    --hover:#1c1c20;
+    --shadow-sm:0 1px 2px rgba(0,0,0,.6);
+    --shadow-md:0 8px 24px rgba(0,0,0,.7);
+    --pessoa-natanael:#b6bfd8;
+    --pessoa-ivanilda:#79b0ff;
+  }
+  /* Papel. Fundo claro e quente, para quem acha o branco duro na vista.
+     O texto e marrom escuro em vez de preto: combina com o fundo sem perder
+     contraste (fica acima de 9:1). */
+  :root[data-tema="sepia"]{
+    color-scheme:light;
+    --bg:#f1e8d5;
+    --surface:#fffaf0;
+    --surface-2:#e5d8bc;
+    --sidebar-bg:#f8f2e4;
+    --sidebar-border:#ddd0b5;
+    --text:#3a3128;
+    --text-light:#6a5e4c;
+    --text-dim:#6f6352;
+    --accent:#4a46c4;
+    --accent-hover:#3a37ab;
+    --accent-btn:#4a46c4;
+    --accent-light:#e6e4f7;
+    --danger:#b3261e;
+    --divider:#e4d9c3;
+    --hover:#eae0cb;
+    --shadow-sm:0 1px 2px rgba(60,45,20,.10);
+    --shadow-md:0 8px 24px rgba(60,45,20,.16);
+    --pessoa-natanael:#55504a;
+    --pessoa-ivanilda:#1c5fbf;
+  }
   :root[data-tema="claro"]{
     color-scheme:light;
     --bg:#f0f0f0;
@@ -193,6 +243,39 @@
   #temaBtn:hover{background:var(--hover);color:var(--text);border-color:var(--text-dim);}
   #temaBtn:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
   #temaBtn .tema-icone{font-size:12px;line-height:1;}
+  /* Painel de aparencia. Fixo, posicionado a partir do botao no momento de
+     abrir: a barra lateral rola, e um painel preso nela sairia junto. */
+  #temaPainel{
+    display:none;position:fixed;z-index:420;width:218px;padding:12px;
+    background:var(--surface);border:1px solid var(--sidebar-border);
+    border-radius:12px;box-shadow:var(--shadow-md);
+  }
+  #temaPainel.aberto{display:block;}
+  #temaPainel h4{
+    margin:0 0 7px;font-size:10.5px;font-weight:600;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--text-dim);
+  }
+  #temaPainel h4.depois{margin-top:14px;}
+  .tema-opcoes{display:grid;grid-template-columns:1fr 1fr;gap:5px;}
+  .tema-opcao{
+    display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:8px;
+    background:var(--sidebar-bg);border:1px solid var(--sidebar-border);
+    color:var(--text);font-size:11.5px;font-family:inherit;cursor:pointer;text-align:left;
+  }
+  .tema-opcao:hover{background:var(--hover);}
+  .tema-opcao.ativo{border-color:var(--accent);color:var(--accent);font-weight:600;}
+  /* A bolinha mostra a cor real do fundo, entao da para escolher pelo olho em
+     vez de pelo nome. */
+  .tema-bolha{width:13px;height:13px;border-radius:50%;flex:none;border:1px solid rgba(128,128,128,.45);}
+  #temaIntensidade{width:100%;margin:2px 0 0;accent-color:var(--accent);}
+  .tema-escala{display:flex;justify-content:space-between;font-size:10px;color:var(--text-dim);margin-top:2px;}
+  #temaIntValor{color:var(--text-light);font-size:11px;text-align:center;margin-top:5px;}
+  #temaReset{
+    width:100%;margin-top:10px;padding:6px;border-radius:8px;cursor:pointer;
+    background:none;border:1px solid var(--sidebar-border);color:var(--text-light);
+    font-size:11.5px;font-family:inherit;
+  }
+  #temaReset:hover{background:var(--hover);color:var(--text);}
   #searchInput{
     width:100%;padding:8px 11px;border:1px solid var(--sidebar-border);border-radius:8px;font-size:13px;
     background:var(--surface);transition:border-color .15s ease, box-shadow .15s ease;
@@ -1481,6 +1564,10 @@
     try{
       var t = localStorage.getItem("roadmapTema");
       if (t && t !== "grafite") document.documentElement.setAttribute("data-tema", t);
+      // O ajuste de intensidade ja vem calculado: recalcular aqui exigiria
+      // repetir as funcoes de cor antes do primeiro desenho.
+      var ajuste = localStorage.getItem("roadmapTemaCss");
+      if (ajuste) document.documentElement.style.cssText += ajuste;
     }catch(e){}
   })();
 </script>
@@ -1512,6 +1599,17 @@
       <button type="button" id="bootLogoutBtn">Trocar de conta</button>
     </div>
   </div>
+</div>
+
+<div id="temaPainel" role="dialog" aria-label="Aparência">
+  <h4>Fundo</h4>
+  <div class="tema-opcoes" id="temaOpcoes"></div>
+  <h4 class="depois">Intensidade</h4>
+  <input type="range" id="temaIntensidade" min="-4" max="4" step="1" value="0"
+         aria-label="Intensidade do fundo">
+  <div class="tema-escala"><span>Mais escuro</span><span>Mais claro</span></div>
+  <div id="temaIntValor">Padrão</div>
+  <button type="button" id="temaReset">Voltar ao padrão</button>
 </div>
 
 <button id="mobileMenuBtn">☰</button>
@@ -3238,10 +3336,129 @@ function ptLigaPainel(){
    A pagina de Apresentacao nao segue isto: tem tokens --ap-* proprios e e uma
    peca escura de proposito, com o PPTX e o PDF capturando o fundo dela. */
 const TEMAS = [
-  { id: "grafite", nome: "Cinza", icone: "\u25d0" },
-  { id: "azul",    nome: "Azul",  icone: "\u25d1" },
-  { id: "claro",   nome: "Claro", icone: "\u25cb" },
+  { id: "grafite", nome: "Cinza", icone: "\u25d0", amostra: "#232529" },
+  { id: "azul",    nome: "Azul",  icone: "\u25d1", amostra: "#182137" },
+  { id: "preto",   nome: "Preto", icone: "\u25cf", amostra: "#000000" },
+  { id: "claro",   nome: "Claro", icone: "\u25cb", amostra: "#f0f0f0" },
+  { id: "sepia",   nome: "Papel", icone: "\u25d4", amostra: "#f1e8d5" },
 ];
+
+/* ---------- Intensidade do fundo ----------
+
+   Os fundos sao conjuntos de variaveis com cores fixas. Para clarear ou
+   escurecer sem reescrever cada conjunto a mao, estas funcoes leem os valores
+   do fundo escolhido e misturam cada um com branco ou preto, gravando o
+   resultado como estilo embutido no <html> — que vence a folha de estilo sem
+   altera-la.
+
+   O CUIDADO QUE IMPORTA: clarear so o fundo de um tema escuro aproxima o texto
+   claro do fundo e a leitura piora. Por isso os tokens de TEXTO andam na
+   direcao OPOSTA, pela metade: o contraste se mantem nas pontas da escala. */
+const TEMA_TOKENS_FUNDO = ["--bg", "--surface", "--surface-2", "--sidebar-bg",
+                           "--hover", "--accent-light", "--divider", "--sidebar-border"];
+const TEMA_TOKENS_TEXTO = ["--text", "--text-light", "--text-dim"];
+const TEMA_PASSO = 0.045;   // 4,5% por degrau; os 4 degraus somam 18%
+
+function hexParaRgb(h){
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(h || "").trim());
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function rgbParaHex(c){
+  return "#" + c.map(v => Math.max(0, Math.min(255, Math.round(v)))
+    .toString(16).padStart(2, "0")).join("");
+}
+/* Luminancia e contraste da WCAG. Existem aqui para a intensidade nao ser um
+   chute: depois de mexer no fundo, da para MEDIR se o texto continua legivel. */
+function luminancia(hex){
+  const c = hexParaRgb(hex);
+  if (!c) return 0;
+  const l = c.map(v => {
+    const x = v / 255;
+    return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * l[0] + 0.7152 * l[1] + 0.0722 * l[2];
+}
+function contrasteEntre(a, b){
+  const x = luminancia(a), y = luminancia(b);
+  const claro = Math.max(x, y), escuro = Math.min(x, y);
+  return (claro + 0.05) / (escuro + 0.05);
+}
+
+/* Afasta o texto do fundo novo ate recuperar o contraste que ele tinha com o
+   fundo antigo.
+
+   Por que medir em vez de deslocar um tanto fixo: a folga de cada token e
+   diferente. O texto principal do tema claro comeca com 10:1 e aguenta; o
+   secundario comeca com 4,7:1 e nao aguenta nada. Um deslocamento unico serve
+   a um e quebra o outro. */
+function corDeTextoAjustada(corTexto, fundoBase, fundoNovo){
+  const alvo = contrasteEntre(corTexto, fundoBase);
+  if (contrasteEntre(corTexto, fundoNovo) >= alvo) return corTexto;
+  const sentido = luminancia(corTexto) > luminancia(fundoNovo) ? 1 : -1;
+  let ultima = corTexto;
+  for (let p = 0.02; p <= 0.9; p += 0.02){
+    ultima = misturarCor(corTexto, sentido * p) || ultima;
+    if (contrasteEntre(ultima, fundoNovo) >= alvo) return ultima;
+  }
+  return ultima;   // chegou ao branco ou ao preto; e o melhor possivel
+}
+
+/** Mistura `hex` com branco (p>0) ou preto (p<0). p em fracao de 0 a 1. */
+function misturarCor(hex, p){
+  const c = hexParaRgb(hex);
+  if (!c) return null;
+  const alvo = p > 0 ? 255 : 0;
+  const f = Math.abs(p);
+  return rgbParaHex(c.map(v => v + (alvo - v) * f));
+}
+
+function intensidadeAtual(){
+  try{ return Math.max(-4, Math.min(4, Number(localStorage.getItem("roadmapTemaInt")) || 0)); }
+  catch(e){ return 0; }
+}
+
+function aplicaIntensidade(n){
+  const raiz = document.documentElement;
+  // Zera antes de medir: senao o ajuste anterior entra na conta e o efeito se
+  // acumula a cada movimento do controle.
+  TEMA_TOKENS_FUNDO.concat(TEMA_TOKENS_TEXTO).forEach(t => raiz.style.removeProperty(t));
+
+  let css = "";
+  if (n){
+    const base = getComputedStyle(raiz);
+    const pFundo = n * TEMA_PASSO;
+
+    // O fundo da pagina e a referencia de todo o resto.
+    const fundoBase = (base.getPropertyValue("--bg") || "").trim();
+    const fundoNovo = misturarCor(fundoBase, pFundo) || fundoBase;
+
+    TEMA_TOKENS_FUNDO.forEach(t => {
+      const novo = misturarCor(base.getPropertyValue(t), pFundo);
+      if (novo){ raiz.style.setProperty(t, novo); css += t + ":" + novo + ";"; }
+    });
+    // Texto: nao um deslocamento adivinhado, e sim o quanto for preciso para
+    // manter o contraste que ele tinha. Cada token tem folga diferente.
+    TEMA_TOKENS_TEXTO.forEach(t => {
+      const atual = (base.getPropertyValue(t) || "").trim();
+      if (!hexParaRgb(atual)) return;
+      const novo = corDeTextoAjustada(atual, fundoBase, fundoNovo);
+      if (novo){ raiz.style.setProperty(t, novo); css += t + ":" + novo + ";"; }
+    });
+  }
+  try{
+    localStorage.setItem("roadmapTemaInt", String(n));
+    // O resultado pronto e guardado para o <head> aplicar antes do primeiro
+    // desenho; recalcular la exigiria repetir estas funcoes.
+    localStorage.setItem("roadmapTemaCss", css);
+  }catch(e){}
+  const campo = document.getElementById("temaIntensidade");
+  if (campo) campo.value = String(n);
+  const rotulo = document.getElementById("temaIntValor");
+  if (rotulo) rotulo.textContent = n === 0 ? "Padr\u00e3o"
+    : (n > 0 ? "+" + n + " mais claro" : n + " mais escuro");
+}
 
 function temaAtual(){
   const id = document.documentElement.getAttribute("data-tema") || "grafite";
@@ -3254,6 +3471,8 @@ function aplicaTema(id){
   if (t.id === "grafite") document.documentElement.removeAttribute("data-tema");
   else document.documentElement.setAttribute("data-tema", t.id);
   try{ localStorage.setItem("roadmapTema", t.id); }catch(e){}
+  // A intensidade e relativa ao fundo: trocar de fundo exige recalcular.
+  if (typeof aplicaIntensidade === "function") aplicaIntensidade(intensidadeAtual());
   const btn = document.getElementById("temaBtn");
   if (btn){
     btn.innerHTML = '<span class="tema-icone" aria-hidden="true">' + t.icone + '</span>' +
@@ -3262,11 +3481,77 @@ function aplicaTema(id){
   }
 }
 
+/* ---------- Painel de aparencia ---------- */
+function renderOpcoesDeTema(){
+  const caixa = document.getElementById("temaOpcoes");
+  if (!caixa) return;
+  const atual = temaAtual().id;
+  caixa.innerHTML = "";
+  TEMAS.forEach(t => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "tema-opcao" + (t.id === atual ? " ativo" : "");
+    const bolha = document.createElement("span");
+    bolha.className = "tema-bolha";
+    bolha.style.background = t.amostra;
+    b.appendChild(bolha);
+    b.appendChild(document.createTextNode(t.nome));
+    b.addEventListener("click", () => {
+      aplicaTema(t.id);
+      renderOpcoesDeTema();
+    });
+    caixa.appendChild(b);
+  });
+}
+
+function fecharPainelTema(){
+  const p = document.getElementById("temaPainel");
+  if (p) p.classList.remove("aberto");
+}
+
+function abrirPainelTema(){
+  const p = document.getElementById("temaPainel");
+  const btn = document.getElementById("temaBtn");
+  if (!p || !btn) return;
+  renderOpcoesDeTema();
+  aplicaIntensidade(intensidadeAtual());   // acerta o controle e o rotulo
+  p.classList.add("aberto");
+  // Posiciona a partir do botao, e corrige se passar da borda da janela.
+  const r = btn.getBoundingClientRect();
+  const largura = p.offsetWidth || 218;
+  let esq = r.left;
+  if (esq + largura > window.innerWidth - 8) esq = window.innerWidth - largura - 8;
+  p.style.left = Math.max(8, esq) + "px";
+  p.style.top = (r.bottom + 6) + "px";
+}
+
 const btnTema = document.getElementById("temaBtn");
-if (btnTema) btnTema.addEventListener("click", () => {
-  const i = TEMAS.indexOf(temaAtual());
-  aplicaTema(TEMAS[(i + 1) % TEMAS.length].id);
+if (btnTema) btnTema.addEventListener("click", (e) => {
+  e.stopPropagation();
+  const p = document.getElementById("temaPainel");
+  if (p && p.classList.contains("aberto")) fecharPainelTema();
+  else abrirPainelTema();
 });
+
+const campoInt = document.getElementById("temaIntensidade");
+if (campoInt) campoInt.addEventListener("input", () => aplicaIntensidade(Number(campoInt.value)));
+
+const btnResetTema = document.getElementById("temaReset");
+if (btnResetTema) btnResetTema.addEventListener("click", () => {
+  aplicaTema("grafite");
+  aplicaIntensidade(0);
+  renderOpcoesDeTema();
+});
+
+document.addEventListener("click", (e) => {
+  const p = document.getElementById("temaPainel");
+  if (!p || !p.classList.contains("aberto")) return;
+  if (!p.contains(e.target) && e.target !== btnTema) fecharPainelTema();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") fecharPainelTema();
+});
+
 // Na carga o fundo ja foi aplicado no <head>; aqui so acerta o rotulo do botao.
 aplicaTema(temaAtual().id);
 
