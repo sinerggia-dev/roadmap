@@ -107,6 +107,20 @@ Os quatro que mais voltam:
 - **`confirm()` é síncrono; `perguntar()` devolve Promise.** Sem `await`, a
   ação destrutiva acontece sem perguntar.
 
+## Achar o que você precisa dentro do index.html
+
+O arquivo tem ~9.800 linhas e cerca de **124 mil tokens**. Lê-lo inteiro ocupa
+quase todo o espaço da conversa e sobra pouco para trabalhar.
+
+`references/mapa-do-codigo.md` resolve isso: lista as 306 funções, 54
+constantes, 640 blocos de CSS e 225 elementos de tela **com o número da
+linha**, em ~14 mil tokens. Consulte o mapa, descubra a linha e leia só aquele
+trecho.
+
+O mapa é gerado por `testes/gerar_mapa.py` a partir do próprio arquivo. Se
+estiver desatualizado — apontando para linhas que não batem — rode o script de
+novo em vez de corrigir à mão.
+
 ## Outras referências
 
 - `references/arquitetura.md` — como o app é organizado por dentro, o que são
