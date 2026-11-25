@@ -801,6 +801,24 @@
   /* Aviso de tabela vazia. Antes, zero linhas era indistinguivel de uma pagina
      que nao carregou — e foi exatamente assim que um filtro invisivel passou
      por uma pessoa que achou que o app tinha perdido os dados. */
+  /* Falha ao ler a pagina. Vermelho de proposito: nao e estado normal, e
+     enquanto ele estiver na tela nada e gravado. */
+  #paginaErro{
+    display:none;margin:14px 0 0;padding:16px 18px;border-radius:12px;
+    background:var(--surface);border:1px solid var(--danger);
+    color:var(--text-light);font-size:13.5px;line-height:1.6;
+  }
+  #paginaErro.visivel{display:block;}
+  #paginaErro b{color:var(--text);}
+  #paginaErro .pe-motivo{
+    display:block;margin:8px 0 0;font-size:12px;color:var(--text-dim);
+    user-select:text;overflow-wrap:anywhere;
+  }
+  #paginaErro button{
+    margin-top:12px;padding:7px 14px;border-radius:8px;cursor:pointer;
+    background:var(--accent-btn);border:1px solid var(--accent-btn);color:#fff;
+    font-size:13px;font-family:inherit;
+  }
   #taskVazio{
     display:none;margin:18px 0;padding:18px 20px;border-radius:12px;
     background:var(--sidebar-bg);border:1px solid var(--sidebar-border);
@@ -1844,6 +1862,7 @@
           <b id="ptHora">--:--</b>
         </span>
       </div>
+      <div id="paginaErro"></div>
       <div id="readOnlyBanner">👁️ Você tem acesso de visualização — não pode editar esta página.</div>
       <input id="pageTitle" placeholder="Sem título">
       <div id="notesView">
@@ -2487,10 +2506,20 @@ async function getJsonByPath(filename){
      exatamente o que se queria trocar. */
   const res = await graphFetch(`${itemsBase()}/${workspaceFolderId}:/${encodeURIComponent(filename)}:/content`,
     { cache: "no-store" });
+  // 404 e o unico "vazio" legitimo: o arquivo ainda nao existe.
   if (res.status === 404) return null;
   if (!res.ok) throw new Error("status " + res.status);
   const text = await res.text();
-  try{ return text ? JSON.parse(text) : null; }catch(e){ return null; }
+  if (!text) throw new Error("o arquivo " + filename + " voltou vazio");
+  try{
+    return JSON.parse(text);
+  }catch(e){
+    /* Antes isto devolvia null, o mesmo valor de "nao existe". Arquivo
+       truncado virava pagina vazia, e a pagina vazia era gravada por cima do
+       original na primeira edicao. Falha de leitura tem que PARECER falha. */
+    throw new Error("o arquivo " + filename + " esta corrompido (" +
+                    text.length + " caracteres ilegiveis)");
+  }
 }
 
 async function putJsonByPath(filename, obj){
@@ -2532,6 +2561,10 @@ async function doSaveIndex(){
 }
 
 function scheduleSavePage(pageId){
+  if (paginasComFalha[pageId]){
+    setStatus("Não salvo — esta página não foi carregada");
+    return;
+  }
   setStatus("Editando…");
   clearTimeout(saveTimers[pageId]);
   saveTimers[pageId] = setTimeout(() => doSavePage(pageId), 1200);
@@ -2539,6 +2572,9 @@ function scheduleSavePage(pageId){
 async function doSavePage(pageId){
   const content = pageContentCache[pageId];
   if (!content) return;
+  /* A trava que impede perda de dados: esta pagina nao foi lida, entao o que
+     esta na memoria e um vazio de emergencia. Grava-lo apagaria o arquivo. */
+  if (paginasComFalha[pageId]) return;
   setStatus("Salvando…");
   try{
     await putJsonByPath("pagina_" + pageId + ".json", content);
@@ -2870,12 +2906,19 @@ async function openPage(id){
     const fallback = defaultContentForKind(meta.kind || "notas");
     try{
       const data = await getJsonByPath("pagina_" + id + ".json");
+      // null aqui so vem de 404: a pagina e nova de verdade.
       pageContentCache[id] = migrateTaskStatuses(data || fallback);
+      delete paginasComFalha[id];
     }catch(e){
+      /* NAO cacheia vazio como se fosse o conteudo. A pagina entra em
+         estado de falha: a tela avisa e o salvamento fica bloqueado,
+         senao a primeira edicao gravaria o vazio por cima do arquivo. */
+      paginasComFalha[id] = (e && e.message) ? e.message : String(e);
       pageContentCache[id] = fallback;
     }
     setStatus("");
   }
+  pintaFalhaDaPagina(id);
 
   await renderEditor();
   highlightActivePage();
@@ -5480,6 +5523,40 @@ document.getElementById("kanbanViewBtn").addEventListener("click", () => {
    filtros sem controle visivel na barra (prioridade) e um que a barra exibe
    errado (responsavel ligado pelo painel lateral), entao a pessoa olhava
    "Todos" em tudo e concluia que o app tinha perdido os dados. */
+/* Paginas cuja leitura falhou. Enquanto o id estiver aqui, nada e gravado
+   nela — e a tela diz por que. */
+const paginasComFalha = {};
+
+function pintaFalhaDaPagina(id){
+  const el = document.getElementById("paginaErro");
+  if (!el) return;
+  const motivo = paginasComFalha[id];
+  if (!motivo){ el.classList.remove("visivel"); el.innerHTML = ""; return; }
+
+  el.innerHTML = "";
+  const t = document.createElement("div");
+  t.innerHTML = "<b>N\u00e3o consegui ler esta p\u00e1gina.</b><br>" +
+    "O que aparece abaixo <b>n\u00e3o \u00e9 o conte\u00fado dela</b>, e nada ser\u00e1 gravado " +
+    "enquanto isso \u2014 para o vazio n\u00e3o substituir o que est\u00e1 salvo.";
+  el.appendChild(t);
+
+  const cod = document.createElement("span");
+  cod.className = "pe-motivo";
+  cod.textContent = motivo;
+  el.appendChild(cod);
+
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.textContent = "Tentar de novo";
+  btn.addEventListener("click", () => {
+    delete paginasComFalha[id];
+    delete pageContentCache[id];
+    openPage(id);
+  });
+  el.appendChild(btn);
+  el.classList.add("visivel");
+}
+
 function pintaTabelaVazia(totalNaPagina, mostradas){
   const el = document.getElementById("taskVazio");
   const wrap = document.getElementById("taskTableWrap");
