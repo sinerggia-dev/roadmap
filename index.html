@@ -798,6 +798,25 @@
   .task-attach-del:hover{color:var(--danger);}
   .task-attach-busy{font-size:11px;color:var(--text-light);}
   .task-attach-empty{font-size:12px;color:var(--text-dim);}
+  /* Aviso de tabela vazia. Antes, zero linhas era indistinguivel de uma pagina
+     que nao carregou — e foi exatamente assim que um filtro invisivel passou
+     por uma pessoa que achou que o app tinha perdido os dados. */
+  #taskVazio{
+    display:none;margin:18px 0;padding:18px 20px;border-radius:12px;
+    background:var(--sidebar-bg);border:1px solid var(--sidebar-border);
+    color:var(--text-light);font-size:13.5px;line-height:1.6;
+  }
+  #taskVazio.visivel{display:block;}
+  #taskVazio b{color:var(--text);}
+  #taskVazio .tv-filtros{
+    display:block;margin:8px 0 0;color:var(--text);font-size:13px;
+  }
+  #taskVazio button{
+    margin-top:12px;padding:7px 14px;border-radius:8px;cursor:pointer;
+    background:var(--accent-btn);border:1px solid var(--accent-btn);color:#fff;
+    font-size:13px;font-family:inherit;
+  }
+  #taskVazio button:hover{filter:brightness(1.08);}
   /* Documento do Office por atividade. */
   .task-doc-wrap{display:flex;align-items:center;gap:6px;min-width:0;}
   .task-doc-link{
@@ -1913,6 +1932,7 @@
             <option value="qtd">Menos atividades</option>
           </select>
         </div>
+        <div id="taskVazio"></div>
         <div id="taskTableWrap">
           <table id="taskTable">
             <thead>
@@ -5453,6 +5473,82 @@ document.getElementById("kanbanViewBtn").addEventListener("click", () => {
   renderTasks();
 });
 
+/* Diz POR QUE a tabela esta vazia.
+
+   Zero linhas tem duas causas muito diferentes — a pagina nao tem atividades,
+   ou um filtro escondeu todas — e na tela elas eram identicas. Pior: ha
+   filtros sem controle visivel na barra (prioridade) e um que a barra exibe
+   errado (responsavel ligado pelo painel lateral), entao a pessoa olhava
+   "Todos" em tudo e concluia que o app tinha perdido os dados. */
+function pintaTabelaVazia(totalNaPagina, mostradas){
+  const el = document.getElementById("taskVazio");
+  const wrap = document.getElementById("taskTableWrap");
+  if (!el) return;
+
+  if (mostradas > 0){
+    el.classList.remove("visivel");
+    el.innerHTML = "";
+    if (wrap) wrap.style.display = "";
+    return;
+  }
+
+  el.innerHTML = "";
+  const filtrando = filtrosAtivos();
+
+  const texto = document.createElement("div");
+  if (!totalNaPagina && !filtrando){
+    texto.innerHTML = "<b>Esta p\u00e1gina ainda n\u00e3o tem atividades.</b><br>" +
+      "Use <b>+ Nova tarefa</b> para criar a primeira.";
+  } else if (filtrando){
+    texto.innerHTML = "<b>Nenhuma atividade corresponde aos filtros.</b><br>" +
+      "A p\u00e1gina tem " + totalNaPagina + " atividade(s) \u2014 os filtros abaixo " +
+      "est\u00e3o escondendo todas.";
+    const lista = document.createElement("span");
+    lista.className = "tv-filtros";
+    lista.textContent = buildActiveFiltersSummary();
+    texto.appendChild(lista);
+  } else {
+    // Sem filtro e com tarefas na pagina: so o atalho de status pode ter
+    // sobrado, e ele tem controle visivel.
+    texto.innerHTML = "<b>Nenhuma atividade neste status.</b><br>" +
+      "A p\u00e1gina tem " + totalNaPagina + " atividade(s).";
+  }
+  el.appendChild(texto);
+
+  if (filtrando || taskFilter !== "Todas"){
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = "Limpar filtros";
+    btn.addEventListener("click", () => {
+      const limpar = document.getElementById("clearFiltersBtn");
+      if (limpar) limpar.click();
+    });
+    el.appendChild(btn);
+  }
+
+  el.classList.add("visivel");
+  // Esconde a casca da tabela: cabecalho sem nenhuma linha parece defeito.
+  if (wrap) wrap.style.display = "none";
+}
+
+/* Algum filtro comum ligado? O de status fica de fora: ele tem controle
+   visivel e aceso na tela. */
+/* A caixa "Responsável" da barra guarda o valor em outro formato; ligada pelo
+   painel lateral, ela nao acha a opção e volta sozinha para "Todos". Quando
+   isso acontece, a barra mente: diz que nao ha filtro enquanto ha. */
+function sincronizaCaixaDeResponsavel(){
+  const sel = document.getElementById("assigneeFilterSelect");
+  if (!sel) return;
+  const tem = Array.prototype.some.call(sel.options, o => o.value === taskAssigneeFilter);
+  if (tem) sel.value = taskAssigneeFilter;
+}
+
+function filtrosAtivos(){
+  return (taskCompanyFilter !== "Todas") || (taskAssigneeFilter !== "Todos") ||
+         (taskPriorityFilter !== "Todas") || (taskDueStateFilter !== "Todos") ||
+         !!taskDueFromFilter || !!taskDueToFilter || !!(taskSearchText || "").trim();
+}
+
 function renderTaskStats(allTasks){
   const base = allTasks.filter(taskMatchesCommonFilters);
 
@@ -5527,6 +5623,10 @@ function renderTaskStats(allTasks){
     label, count: data.count, active: taskAssigneeFilter === data.email,
     onClick: () => {
       taskAssigneeFilter = taskAssigneeFilter === data.email ? "Todos" : data.email;
+      // A caixa da barra tem que acompanhar: ligado por aqui, o filtro recebe
+      // um e-mail que ela pode nao ter como opção, e ela voltava a exibir
+      // "Todos" — mostrando o contrario do que estava valendo.
+      sincronizaCaixaDeResponsavel();
       renderTasks();
     }
   })));
@@ -5557,6 +5657,7 @@ function renderTasks(){
   if (taskGroupByCompany) renderTableGrouped(tbody, sorted, assigneeOptions);
   else sorted.forEach(task => tbody.appendChild(renderTaskRow(task, assigneeOptions)));
   renderSelectAllHeaderCell(sorted);
+  pintaTabelaVazia(content.tasks.length, sorted.length);
   // No celular os filtros ficam recolhidos: a contagem no botao e o unico
   // sinal de que algum esta ligado. Precisa acompanhar cada redesenho.
   if (typeof atualizaBotaoFiltros === "function") atualizaBotaoFiltros();
