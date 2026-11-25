@@ -2575,9 +2575,24 @@ async function doSavePage(pageId){
   /* A trava que impede perda de dados: esta pagina nao foi lida, entao o que
      esta na memoria e um vazio de emergencia. Grava-lo apagaria o arquivo. */
   if (paginasComFalha[pageId]) return;
+
+  /* Segunda trava, para a classe toda: trocar conteudo cheio por vazio e
+     drastico demais para acontecer calado. Zero e o criterio por nao dar falso
+     positivo — apagar tudo de uma vez e raro, e quando for de proposito basta
+     confirmar na tela. */
+  const antes = contagemCarregada[pageId];
+  const agora = contagemDeItens(content);
+  if (antes > 0 && agora === 0 && !quedaBrusca[pageId]){
+    quedaBrusca[pageId] = { de: antes };
+    pintaQuedaBrusca(pageId);
+    setStatus("N\u00e3o salvo \u2014 a p\u00e1gina ficaria vazia");
+    return;
+  }
   setStatus("Salvando…");
   try{
     await putJsonByPath("pagina_" + pageId + ".json", content);
+    // A referencia acompanha o que foi mesmo gravado.
+    contagemCarregada[pageId] = agora;
     setStatus("Salvo às " + new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }));
   }catch(err){
     setStatus("Erro ao salvar — tentando de novo…");
@@ -2908,7 +2923,9 @@ async function openPage(id){
       const data = await getJsonByPath("pagina_" + id + ".json");
       // null aqui so vem de 404: a pagina e nova de verdade.
       pageContentCache[id] = migrateTaskStatuses(data || fallback);
+      contagemCarregada[id] = contagemDeItens(pageContentCache[id]);
       delete paginasComFalha[id];
+      delete quedaBrusca[id];
     }catch(e){
       /* NAO cacheia vazio como se fosse o conteudo. A pagina entra em
          estado de falha: a tela avisa e o salvamento fica bloqueado,
@@ -5526,6 +5543,80 @@ document.getElementById("kanbanViewBtn").addEventListener("click", () => {
 /* Paginas cuja leitura falhou. Enquanto o id estiver aqui, nada e gravado
    nela — e a tela diz por que. */
 const paginasComFalha = {};
+
+/* Quantos itens a pagina tinha da ultima vez que sabemos que estava certa:
+   ao ser lida, e depois de cada gravacao bem-sucedida. E a referencia para
+   desconfiar de uma gravacao que zera tudo. */
+const contagemCarregada = {};
+/* Paginas onde a gravacao foi barrada por zerar o conteudo, esperando decisao. */
+const quedaBrusca = {};
+
+function contagemDeItens(content){
+  if (!content) return 0;
+  let n = 0;
+  if (Array.isArray(content.tasks)) n += content.tasks.length;
+  if (Array.isArray(content.events)) n += content.events.length;
+  // Uma pagina de notas nasce com um bloco vazio; isso nao conta como conteudo.
+  if (Array.isArray(content.blocks)){
+    n += content.blocks.filter(b => (b && String(b.content || "").trim())).length;
+  }
+  return n;
+}
+
+/* A pagina ficaria vazia. Em vez de uma janela surgindo sozinha — o
+   salvamento roda por temporizador, nao por clique —, o aviso fica na tela
+   ate a pessoa decidir. */
+function pintaQuedaBrusca(id){
+  const el = document.getElementById("paginaErro");
+  if (!el || !quedaBrusca[id]) return;
+  el.innerHTML = "";
+
+  const t = document.createElement("div");
+  t.innerHTML = "<b>N\u00e3o gravei: a p\u00e1gina ficaria vazia.</b><br>" +
+    "Ela tinha <b>" + quedaBrusca[id].de + " item(ns)</b> e o que est\u00e1 na tela " +
+    "agora n\u00e3o tem nenhum. O arquivo no OneDrive <b>continua intacto</b>.";
+  el.appendChild(t);
+
+  const dica = document.createElement("span");
+  dica.className = "pe-motivo";
+  dica.textContent = "Se foi sem querer, recarregue a p\u00e1gina (Ctrl+F5) e nada " +
+    "se perde. Se voc\u00ea realmente quis esvaziar, confirme ao lado.";
+  el.appendChild(dica);
+
+  const ok = document.createElement("button");
+  ok.type = "button";
+  ok.textContent = "Esvaziar mesmo assim";
+  ok.addEventListener("click", async () => {
+    if (!(await perguntar("Isto vai apagar os " + quedaBrusca[id].de +
+                          " item(ns) desta p\u00e1gina. Continuar?",
+                          { titulo: "Esvaziar p\u00e1gina", ok: "Esvaziar", perigo: true }))) return;
+    // Zera a referencia: a partir daqui o vazio passa a ser o esperado.
+    contagemCarregada[id] = 0;
+    delete quedaBrusca[id];
+    el.classList.remove("visivel");
+    el.innerHTML = "";
+    doSavePage(id);
+  });
+  el.appendChild(ok);
+
+  const nao = document.createElement("button");
+  nao.type = "button";
+  nao.textContent = "Recarregar e descartar";
+  nao.style.marginLeft = "8px";
+  nao.style.background = "none";
+  nao.style.color = "var(--text-light)";
+  nao.style.borderColor = "var(--sidebar-border)";
+  nao.addEventListener("click", () => {
+    delete quedaBrusca[id];
+    delete pageContentCache[id];
+    el.classList.remove("visivel");
+    el.innerHTML = "";
+    openPage(id);
+  });
+  el.appendChild(nao);
+
+  el.classList.add("visivel");
+}
 
 function pintaFalhaDaPagina(id){
   const el = document.getElementById("paginaErro");
